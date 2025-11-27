@@ -1,29 +1,66 @@
 from flask import Flask, jsonify
 import os
 from datetime import datetime
+import time
 
 app = Flask(__name__)
 
-request_count = 0
+metrics = {
+    "total_requests": 0,
+    "successful_requests": 0,
+    "failed_requests": 0,
+    "start_time": time.time()
+}    
 
 @app.route('/')
 def home():
-    global request_count
-    request_count += 1
+    metrics["total_requests"] += 1
+    metrics["successful_requests"] += 1
+
     response = {
         "message": "SRE Application level 1",
-        "version": os.getenv("APP_VERSION", "1.0.0"),
-        "total_requests": request_count
+        "version": os.getenv("APP_VERSION", "1.0.0")
     }
     return jsonify(response)
 
 @app.route('/health')
 def health():
+    uptime_seconds = time.time() - metrics["start_time"]
+
     response = {
         "status": "healthy",
+        "uptime_seconds": round(uptime_seconds, 2),
         "timestamp": datetime.now().isoformat()
     }
     return jsonify(response)
+
+@app.route('/metrics')
+def get_metrics():
+    uptime_seconds = time.time() - metrics["start_time"]
+
+    if metrics["total_requests"] > 0:
+        success_rate = (metrics["successful_requests"] / metrics["total_requests"]) * 100
+    else:
+        success_rate = 100.0
+
+    return jsonify({
+        "total_requests": metrics["total_requests"],
+        "successful_requests": metrics["successful_requests"],
+        "failed_requests": metrics["failed_requests"],
+        "success_rate_percent": round(success_rate, 2),
+        "uptime_seconds": round(uptime_seconds, 2),
+        "uptime_minutes": round(uptime_seconds / 60, 2)
+    })
+
+@app.errorhandler(Exception)
+def handle_error(error):
+    metrics["total_requests"] += 1
+    metrics["failed_requests"] += 1
+
+    response = {
+        "error": str(error)
+    }
+    return jsonify(response), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
