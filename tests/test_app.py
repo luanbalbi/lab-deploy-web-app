@@ -24,9 +24,11 @@ def test_health_endpoint(client):
     assert data["status"] == "healthy"
 
 def test_request_counter(client):
+    response1 = client.get('/')
     response1 = client.get('/metrics')
     count1 = response1.get_json()["total_requests"]
 
+    response2 = client.get('/')
     response2 = client.get('/metrics')
     count2 = response2.get_json()["total_requests"]
 
